@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX — Paper Trader</title>
+<!-- ── DEVICE DETECTION — runs before CSS to avoid layout flash ── -->
+<script>
+(function(){
+  var ua      = navigator.userAgent;
+  var isPhone = /iPhone|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  var isTablet= /iPad|Android(?!.*Mobile)/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
+  var hasTouch= ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  var narrow  = window.innerWidth <= 768;
+  var mobile  = isPhone || (hasTouch && narrow) || narrow;
+  var tablet  = !mobile && (isTablet || (hasTouch && window.innerWidth <= 1024));
+  if (mobile)       document.documentElement.classList.add('is-mobile');
+  else if (tablet)  document.documentElement.classList.add('is-tablet');
+  else              document.documentElement.classList.add('is-desktop');
+  window._APEX_DEVICE = mobile ? 'mobile' : tablet ? 'tablet' : 'desktop';
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="paper-trader-panel.css">
+<style>
+  /* papertrader.html — panel starts at left edge (no sidebar) */
+  .pt-view { left: 0 !important; }
+  /* .pt-page is used by base.css to position toasts correctly on this page */
+  .pt-page .tstack { bottom: 18px; }
+</style>
+<!-- AUTH — must load before app scripts -->
+<script src="auth.js"></script>
+</head>
+<body>
+<canvas id="bgC"></canvas>
+<div class="noise"></div>
+
+<div class="app pt-page">
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">
+      <div class="logo-glyph">A</div>
+      <div><div class="logo-name">APEX</div><div class="logo-tag">Paper Trading</div></div>
+    </div>
+    <div class="nav-links">
+      <a href="index.html" class="nl" id="navTab-trade" style="text-decoration:none">Trade</a>
+      <button class="nl on" id="navTab-papertrader" style="display:flex;align-items:center;gap:5px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Paper Trader
+      </button>
+    </div>
+    <div class="nav-r">
+      <div class="pill mob-bal-pill" onclick="resetAcc()" title="Reset account" style="cursor:pointer;transition:all .18s" onmouseover="this.style.borderColor='rgba(244,63,94,0.4)';this.style.background='rgba(244,63,94,.13)'" onmouseout="this.style.borderColor='rgba(244,63,94,0.2)';this.style.background='transparent'">
+        <span class="lbl">Account Balance</span>
+        <span class="val" id="acc" style="color:var(--cyan)">$100,000.00</span>
+      </div>
+      <div class="pill"><span class="lbl">Session PnL</span><span class="val" id="sPnl" style="color:var(--t3)">$0.00</span></div>
+      <button id="settingsNavBtn" class="nbtn" onclick="openAppSettings()">⚙ Settings</button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       PAPER TRADER PANEL — full page on papertrader.html
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="pt-view visible" id="ptView">
+    <div class="pt-layout">
+
+      <!-- ── LEFT: Order Form + Order Book ── -->
+      <div class="pt-left">
+
+        <!-- ORDER FORM (scrollable) -->
+        <div class="pt-card">
+
+          <!-- header: section label + active pair -->
+          <div class="pt-card-hd">
+            <span class="pt-card-title">Place Order</span>
+            <span class="pt-pair-badge" id="ptPairBadge">BTC/USDT</span>
+          </div>
+
+          <!-- Buy / Sell segment -->
+          <div class="bst pt-bst">
+            <button class="bsb buy on" id="ptBuyBtn"  onclick="setSide('buy');_syncPTButtons()">Buy</button>
+            <button class="bsb sell"   id="ptSellBtn" onclick="setSide('sell');_syncPTButtons()">Sell</button>
+          </div>
+
+          <!-- Order type -->
+          <div class="otr pt-otr">
+            <button class="otb on" onclick="setOT(this,'market')">Market</button>
+            <button class="otb"    onclick="setOT(this,'limit')">Limit</button>
+            <button class="otb"    onclick="setOT(this,'stop')">Stop-L</button>
+          </div>
+
+          <!-- Limit price (hidden for market orders) -->
+          <div class="fg" id="ptLpf" style="display:none">
+            <div class="fl">Limit Price</div>
+            <div class="fw">
+              <input type="number" class="fi" id="ptLp" placeholder="0.00">
+              <span class="fu">USDT</span>
+            </div>
+          </div>
+
+          <!-- Amount -->
+          <div class="fg">
+            <div class="fl">
+              Amount
+              <span id="ptAvShow">Avail: $100,000.00</span>
+            </div>
+            <div class="fw">
+              <input type="number" class="fi" id="ptAmt" placeholder="0.00000" oninput="_ptCalcT()">
+              <span class="fu" id="ptAunit">BTC</span>
+            </div>
+          </div>
+
+          <!-- Percentage slider -->
+          <div class="slw">
+            <input type="range" min="0" max="100" value="0" id="ptPsl" oninput="_ptSlPct(this.value)">
+            <div class="pl">
+              <span class="plb" onclick="_ptSlPct(0)">0%</span>
+              <span class="plb" onclick="_ptSlPct(25)">25%</span>
+              <span class="plb" onclick="_ptSlPct(50)">50%</span>
+              <span class="plb" onclick="_ptSlPct(75)">75%</span>
+              <span class="plb" onclick="_ptSlPct(100)">100%</span>
+            </div>
+          </div>
+
+          <!-- Order summary -->
+          <div class="osum">
+            <div class="sr">
+              <span class="sl">Pair</span>
+              <span class="sv" id="ptSPair" style="color:var(--cyan)">BTC/USDT</span>
+            </div>
+            <div class="sr">
+              <span class="sl">Price</span>
+              <span class="sv" id="ptSPrice">Market</span>
+            </div>
+            <div class="sr">
+              <span class="sl">Total</span>
+              <span class="sv" id="ptSTotal" style="color:var(--cyan)">$0.00</span>
+            </div>
+            <div class="sr">
+              <span class="sl">Fee (0.1%)</span>
+              <span class="sv dim" id="ptSFee">$0.00</span>
+            </div>
+          </div>
+
+          <!-- Place order button -->
+          <button class="pob buy" id="ptPlaceBtn" onclick="placeOrder()">BUY BTC</button>
+
+        </div><!-- /.pt-card (order form) -->
+
+        <!-- ORDER BOOK -->
+        <div class="pt-card pt-book-card">
+          <div class="pt-card-hd">
+            <span class="pt-card-title">Order Book</span>
+          </div>
+          <div class="obw">
+            <div class="obh">
+              <span>Price (USDT)</span>
+              <span>Qty</span>
+              <span>Total</span>
+            </div>
+            <div class="ob-asks" id="ptObA"></div>
+            <div class="ob-mid">
+              <span class="live"></span>
+              <span class="ob-mp" id="ptObP">—</span>
+              <span class="ob-mt up" id="ptObT">+0.00%</span>
+            </div>
+            <div class="ob-bids" id="ptObB"></div>
+          </div>
+        </div>
+
+      </div><!-- /.pt-left -->
+
+      <!-- ── RIGHT: Stats bar + Positions table + History table ── -->
+      <div class="pt-right">
+
+        <!-- Stats bar (balance / pnl / counts / reset) -->
+        <div class="pt-stats-bar">
+          <div class="pt-stat">
+            <span class="pt-stat-lbl">Balance</span>
+            <span class="pt-stat-val" id="ptStatBal">$100,000.00</span>
+          </div>
+          <div class="pt-stat">
+            <span class="pt-stat-lbl">Session PnL</span>
+            <span class="pt-stat-val" id="ptStatPnl" style="color:var(--t3)">$0.00</span>
+          </div>
+          <div class="pt-stat">
+            <span class="pt-stat-lbl">Open Positions</span>
+            <span class="pt-stat-val" id="ptStatPos">0</span>
+          </div>
+          <div class="pt-stat">
+            <span class="pt-stat-lbl">Total Trades</span>
+            <span class="pt-stat-val" id="ptStatTrades">0</span>
+          </div>
+          <button class="nbtn danger" onclick="resetAcc()" title="Reset account to $100,000">↺ Reset</button>
+        </div>
+
+        <!-- Open Positions table -->
+        <div class="pt-table-block">
+          <div class="pt-table-hd">
+            <span class="pt-table-title">Open Positions</span>
+            <span class="bdg" id="ptPosBdg" style="background:var(--cyan);color:#000;padding:1px 6px;border-radius:10px;font-size:9px;font-weight:700">0</span>
+          </div>
+          <div class="bc-scroll pt-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Pair</th>
+                  <th>Side</th>
+                  <th>Size</th>
+                  <th>Entry</th>
+                  <th>Mark</th>
+                  <th>Unrealized PnL</th>
+                  <th>ROE</th>
+                  <th>Value</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="ptPosTb"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Trade History table -->
+        <div class="pt-table-block pt-hist-block">
+          <div class="pt-table-hd">
+            <span class="pt-table-title">Trade History</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button class="dt-btn dt-export" onclick="exportTradeData()" title="Export JSON">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
+              <button class="dt-btn dt-import" onclick="importTradeData()" title="Import JSON">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import
+              </button>
+            </div>
+          </div>
+          <div class="bc-scroll pt-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Pair</th>
+                  <th>Side</th>
+                  <th>Fill Price</th>
+                  <th>Amount</th>
+                  <th>Total</th>
+                  <th>Fee</th>
+                  <th>Realized PnL</th>
+                </tr>
+              </thead>
+              <tbody id="ptHistTb"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /.pt-right -->
+    </div><!-- /.pt-layout -->
+  </div><!-- /#ptView -->
+
+</div><!-- /.app -->
+
+<div class="tstack" id="tstack"></div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobNav">
+  <button class="mob-tab on" id="mobTab-trade" onclick="mobSwitch('trade')">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Trade
+  </button>
+  <button class="mob-tab" id="mobTab-positions" onclick="mobSwitch('positions')">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    Positions
+  </button>
+  <button class="mob-tab" id="mobTab-logout" style="color:rgba(244,63,94,0.8)" onclick="(function(){sessionStorage.removeItem('apex_authed_user');localStorage.removeItem('apex_remember_user');location.reload();})()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="stroke:rgba(244,63,94,0.8)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Logout
+  </button>
+</nav>
+
+<!-- ── SCRIPTS — order matters ── -->
+<script src="state.js"></script>
+<script src="feed.js"></script>
+<script src="orderbook.js"></script>
+<script src="trading.js"></script>
+<script src="data_transfer.js"></script>
+<script src="settings.js"></script>
+<script src="panels.js"></script>
+<script src="ui.js"></script>
+<script src="sounds.js"></script>
+
+<script>
+// ── BG ANIMATION ──────────────────────────────────────────────────────
+(()=>{const c=document.getElementById('bgC'),x=c.getContext('2d');let W,H,pts;const init=()=>{W=c.width=innerWidth;H=c.height=innerHeight;pts=Array.from({length:6},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*260+130,hue:Math.random()>.5?'0,212,255':'130,90,250'}));};const draw=()=>{x.clearRect(0,0,W,H);pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<-p.r||p.x>W+p.r)p.vx*=-1;if(p.y<-p.r||p.y>H+p.r)p.vy*=-1;const g=x.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);g.addColorStop(0,`rgba(${p.hue},.065)`);g.addColorStop(1,`rgba(${p.hue},0)`);x.fillStyle=g;x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fill();});requestAnimationFrame(draw);};window.addEventListener('resize',init);init();draw();})();
+
+// ── BOOTSTRAP ─────────────────────────────────────────────────────────
+loadSettings();            // settings.js — restore persisted prefs
+_initAutoSave();           // settings.js — wire auto-save hooks
+
+renderPos();
+renderHist();
+startFeed();               // feed.js — open WebSocket for live prices
+
+setInterval(loop, 750);
+_initMobile();
+</script>
+</body>
+</html>

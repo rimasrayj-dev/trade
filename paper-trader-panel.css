@@ -1,0 +1,732 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   APEX — Paper Trader Panel
+   Shared by both index.html (Trade page) and papertrader.html (PT page).
+
+   Default: panel is offset right of the 235px sidebar (index.html).
+   Override for papertrader.html — add this in the page <head>:
+     <style>.pt-view { left: 0 !important; }</style>
+   ═══════════════════════════════════════════════════════════════════════ */
+
+
+/* ── RESET pt-view layout ───────────────────────────────────────────── */
+.pt-view {
+  position: fixed;
+  inset: 52px 0 0 235px;   /* below nav, right of sidebar */
+  display: none;
+  flex-direction: column;
+  background: var(--bg-deep);
+  overflow: hidden;
+  z-index: 10;
+}
+html.is-tablet .pt-view { left: 200px; }
+html.is-mobile .pt-view { inset: 52px 0 56px 0; }
+
+.pt-view.visible { display: flex; }
+
+/* ── STATS BAR ──────────────────────────────────────────────────────── */
+.pt-stats-bar {
+  display: flex;
+  align-items: stretch;
+  height: 46px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-mid);
+  flex-shrink: 0;
+  padding: 0 16px;
+  gap: 0;
+}
+
+.pt-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 20px;
+  border-right: 1px solid var(--border-dim);
+  min-width: 0;
+}
+.pt-stat:first-child { padding-left: 0; }
+
+.pt-stat-lbl {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.pt-stat-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--t1);
+  white-space: nowrap;
+}
+
+/* reset button in stats bar */
+.pt-stats-bar .nbtn.danger,
+.pt-stats-bar button[onclick*="resetAcc"] {
+  margin-left: auto;
+  align-self: center;
+  height: 28px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid rgba(244,63,94,0.3);
+  color: var(--red);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.pt-stats-bar .nbtn.danger:hover,
+.pt-stats-bar button[onclick*="resetAcc"]:hover {
+  background: var(--red-dim);
+  border-color: rgba(244,63,94,0.6);
+}
+
+/* ── MAIN LAYOUT ────────────────────────────────────────────────────── */
+.pt-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.is-tablet .pt-layout { grid-template-columns: 270px 1fr; }
+
+/* ── LEFT COLUMN ────────────────────────────────────────────────────── */
+.pt-left {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-mid);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── ORDER FORM CARD ────────────────────────────────────────────────── */
+.pt-card {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* scrollable form wrapper */
+.pt-left > .pt-card:first-child {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 14px 14px 0;
+}
+.pt-left > .pt-card:first-child::-webkit-scrollbar { width: 3px; }
+.pt-left > .pt-card:first-child::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 2px;
+}
+
+/* card header row */
+.pt-card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
+}
+
+.pt-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+}
+
+.pt-pair-badge {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--cyan);
+  background: transparent;
+  border: none;
+  padding: 0;
+  letter-spacing: 0.04em;
+}
+
+/* ── BUY / SELL SEGMENT ─────────────────────────────────────────────── */
+.pt-bst,
+.bst.pt-bst {
+  display: flex;
+  border: 1px solid var(--border-mid);
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: var(--bg-card);
+}
+
+.bsb {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--t3);
+  transition: all 0.15s;
+}
+.bsb:hover { color: var(--t2); }
+.bsb.buy.on  { background: var(--green-dim); color: var(--green); }
+.bsb.sell.on { background: var(--red-dim);   color: var(--red); }
+
+/* ── ORDER TYPE ROW ─────────────────────────────────────────────────── */
+.pt-otr,
+.otr.pt-otr {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.otb {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  border: 1px solid var(--border-dim);
+  background: transparent;
+  color: var(--t3);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.14s;
+}
+.otb:hover { color: var(--t2); border-color: var(--border-mid); }
+.otb.on {
+  border-color: rgba(0,212,255,0.5);
+  color: var(--cyan);
+  background: var(--cyan-dim);
+}
+
+/* ── FIELD GROUPS ───────────────────────────────────────────────────── */
+.fg {
+  margin-bottom: 10px;
+}
+
+.fl {
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* available balance label inside .fl */
+.fl > span[id*="Av"],
+#ptAvShow {
+  color: var(--t2);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 9px;
+}
+
+.fw {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 5px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.fw:focus-within { border-color: var(--border-bright); }
+
+.fi {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--t1);
+  min-width: 0;
+}
+.fi::placeholder { color: var(--t3); }
+
+/* unit label inside input row */
+.fu {
+  padding: 0 10px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--t3);
+  border-left: 1px solid var(--border-dim);
+  background: var(--bg-hover);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  min-height: 34px;
+}
+
+/* limit price field — hidden by default */
+#ptLpf { display: none; }
+
+/* ── PERCENTAGE SLIDER ──────────────────────────────────────────────── */
+.slw {
+  margin-bottom: 12px;
+}
+
+.slw input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--border-mid);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+  margin-bottom: 6px;
+  display: block;
+}
+.slw input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid var(--bg-panel);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.slw input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slw input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid var(--bg-panel);
+  cursor: pointer;
+}
+
+.pl {
+  display: flex;
+  justify-content: space-between;
+}
+
+.plb {
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--t3);
+  cursor: pointer;
+  transition: color 0.12s;
+  user-select: none;
+}
+.plb:hover { color: var(--cyan); }
+
+/* ── ORDER SUMMARY ──────────────────────────────────────────────────── */
+.osum {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin-bottom: 12px;
+}
+
+.sr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.sr + .sr { border-top: 1px solid var(--border-dim); }
+
+.sl {
+  font-size: 10px;
+  color: var(--t3);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.sv {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--t2);
+}
+.sv.dim { color: var(--t3); }
+
+/* ── PLACE ORDER BUTTON ─────────────────────────────────────────────── */
+.pob {
+  width: 100%;
+  padding: 11px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-family: var(--mono);
+  transition: opacity 0.15s, transform 0.12s;
+  margin-bottom: 14px;
+}
+.pob.buy  { background: linear-gradient(135deg, #16a34a, var(--green)); color: #fff; }
+.pob.sell { background: linear-gradient(135deg, #be123c, var(--red));   color: #fff; }
+.pob:hover  { opacity: 0.88; transform: translateY(-1px); }
+.pob:active { opacity: 1;    transform: translateY(0); }
+
+/* ── ORDER BOOK CARD ────────────────────────────────────────────────── */
+.pt-book-card {
+  border-top: 1px solid var(--border-mid);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 242px;
+}
+
+.pt-book-card .pt-card-hd {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.obw {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* column headers */
+.obh {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 4px 14px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--t3);
+  font-family: var(--mono);
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+}
+.obh span:not(:first-child) { text-align: right; }
+
+/* ask / bid rows */
+.ob-asks,
+.ob-bids {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.ob-asks { justify-content: flex-start; }
+
+/* individual row */
+.ob-asks > div,
+.ob-bids > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 2px 14px;
+  font-size: 10px;
+  font-family: var(--mono);
+  position: relative;
+  cursor: default;
+  transition: background 0.1s;
+}
+.ob-asks > div:hover,
+.ob-bids > div:hover { background: var(--bg-hover); }
+
+/* depth bar behind each row */
+.ob-asks > div::after,
+.ob-bids > div::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  pointer-events: none;
+}
+.ob-asks > div::after { background: var(--red-dim); }
+.ob-bids > div::after { background: var(--green-dim); }
+
+/* price column colours */
+.ob-asks > div > span:first-child { color: var(--red); }
+.ob-bids > div > span:first-child { color: var(--green); }
+
+/* qty + total */
+.ob-asks > div > span:not(:first-child),
+.ob-bids > div > span:not(:first-child) {
+  color: var(--t2);
+  text-align: right;
+}
+
+/* mid price row */
+.ob-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-top: 1px solid var(--border-dim);
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+}
+
+.ob-mp {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--mono);
+  color: var(--cyan);
+}
+
+.ob-mt {
+  font-size: 10px;
+  font-family: var(--mono);
+}
+.ob-mt.up { color: var(--green); }
+.ob-mt.dn { color: var(--red); }
+
+/* live pulse dot */
+.live {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: livePulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes livePulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* ── RIGHT COLUMN ───────────────────────────────────────────────────── */
+.pt-right {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── TABLE BLOCKS ───────────────────────────────────────────────────── */
+.pt-table-block {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  border: none;
+  background: transparent;
+}
+
+/* positions table: fixed height with min-height so it never collapses */
+.pt-table-block:not(.pt-hist-block) {
+  flex: 0 0 auto;
+  min-height: 80px;
+  max-height: 220px;
+  border-bottom: 1px solid var(--border-mid);
+}
+
+/* history table: fills remaining space */
+.pt-hist-block {
+  flex: 1;
+  min-height: 0;
+}
+
+.pt-table-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border-dim);
+  flex-shrink: 0;
+  background: var(--bg-panel);
+}
+
+.pt-table-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+}
+
+/* badge count bubble — no !important needed */
+#ptPosBdg {
+  background: var(--cyan);
+  color: #000;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+
+/* ── EXPORT / IMPORT BUTTONS ────────────────────────────────────────── */
+/* Base colours live in base.css (.dt-export / .dt-import).
+   Only PT-specific sizing override belongs here. */
+.dt-btn {
+  padding: 4px 10px;
+  font-size: 9px;
+}
+
+/* auto-push export/import wrapper to the right */
+.pt-table-hd > div[style*="margin-left:auto"],
+.pt-table-hd > div:last-child {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+}
+
+/* ── SCROLLABLE TABLE AREA ──────────────────────────────────────────── */
+.pt-table-scroll,
+.bc-scroll.pt-table-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.pt-table-scroll::-webkit-scrollbar { width: 3px; height: 3px; }
+.pt-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 2px;
+}
+
+/* ── TABLES ─────────────────────────────────────────────────────────── */
+.pt-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+.pt-table-scroll thead th {
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-weight: 400;
+  border-bottom: 1px solid var(--border-dim);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.pt-table-scroll tbody td {
+  padding: 7px 12px;
+  color: var(--t2);
+  border-bottom: 1px solid var(--border-dim);
+  white-space: nowrap;
+}
+
+.pt-table-scroll tbody tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* semantic cell colours injected by trading.js */
+.pt-table-scroll .up,
+.pt-table-scroll .buy  { color: var(--green) !important; }
+.pt-table-scroll .dn,
+.pt-table-scroll .sell { color: var(--red)   !important; }
+
+/* close position button */
+.pt-table-scroll .close-btn,
+.pt-table-scroll button[onclick*="closePos"],
+.pt-table-scroll button[onclick*="close"] {
+  padding: 3px 8px;
+  font-size: 9px;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  background: transparent;
+  border: 1px solid rgba(244,63,94,0.35);
+  color: var(--red);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.pt-table-scroll .close-btn:hover,
+.pt-table-scroll button[onclick*="closePos"]:hover,
+.pt-table-scroll button[onclick*="close"]:hover {
+  background: var(--red-dim);
+  border-color: rgba(244,63,94,0.65);
+}
+
+/* empty state rows */
+.pt-table-scroll tbody tr.empty td,
+.pt-table-scroll tbody tr td[colspan] {
+  text-align: center;
+  color: var(--t3);
+  padding: 22px 12px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  border: none;
+}
+
+/* ── MOBILE OVERRIDES ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pt-view {
+    inset: 52px 0 56px 0;
+  }
+
+  .pt-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    overflow-y: auto;
+  }
+
+  .pt-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border-mid);
+    height: auto;
+    overflow: visible;
+  }
+
+  .pt-left > .pt-card:first-child {
+    overflow: visible;
+    flex: none;
+  }
+
+  .pt-book-card {
+    height: 200px;
+  }
+
+  .pt-right {
+    min-height: 400px;
+  }
+
+  .pt-stats-bar {
+    gap: 0;
+    overflow-x: auto;
+    padding: 0 10px;
+  }
+  .pt-stat { padding: 0 12px; }
+
+  .pt-table-block:not(.pt-hist-block) {
+    max-height: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pt-stats-bar .pt-stat:nth-child(n+3) { display: none; }
+}

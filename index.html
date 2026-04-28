@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX — Trade</title>
+<!-- ── DEVICE DETECTION — runs before CSS to avoid layout flash ── -->
+<script>
+(function(){
+  var ua      = navigator.userAgent;
+  var isPhone = /iPhone|Android.*Mobile|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  var isTablet= /iPad|Android(?!.*Mobile)/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
+  var hasTouch= ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  var narrow  = window.innerWidth <= 768;
+  var mobile  = isPhone || (hasTouch && narrow) || narrow;
+  var tablet  = !mobile && (isTablet || (hasTouch && window.innerWidth <= 1024));
+  if (mobile)       document.documentElement.classList.add('is-mobile');
+  else if (tablet)  document.documentElement.classList.add('is-tablet');
+  else              document.documentElement.classList.add('is-desktop');
+  window._APEX_DEVICE = mobile ? 'mobile' : tablet ? 'tablet' : 'desktop';
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="chart.css">
+<link rel="stylesheet" href="paper-trader-panel.css">
+<style>
+  /* Chart fills full space — no paper trader panel on this page */
+  html.is-desktop .app,
+  html.is-tablet .app,
+  .app {
+    grid-template-columns: 235px 1fr !important;
+    grid-template-rows: 52px 1fr !important;
+  }
+  html.is-tablet .app {
+    grid-template-columns: 200px 1fr !important;
+    grid-template-rows: 52px 1fr !important;
+  }
+  .main {
+    grid-column: 2 / -1 !important;
+    grid-row: 2 / -1 !important;
+  }
+  .sidebar {
+    grid-row: 2 / -1 !important;
+  }
+</style>
+<!-- AUTH — must load before app scripts -->
+<script src="auth.js"></script>
+
+<!-- Lightweight Charts v4 — TradingView, Apache-2.0 -->
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+<canvas id="bgC"></canvas>
+<div class="noise"></div>
+
+<div class="app">
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">
+      <div class="logo-glyph">A</div>
+      <div><div class="logo-name">APEX</div><div class="logo-tag">Paper Trading</div></div>
+    </div>
+    <div class="nav-links">
+      <button class="nl on" id="navTab-trade">Trade</button>
+      <a href="papertrader.html" class="nl" id="navTab-papertrader" style="display:flex;align-items:center;gap:5px;text-decoration:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Paper Trader
+      </a>
+    </div>
+    <div class="nav-r">
+      <div class="pill mob-bal-pill" onclick="resetAcc()" title="Reset account" style="cursor:pointer;transition:all .18s" onmouseover="this.style.borderColor='rgba(244,63,94,0.4)';this.style.background='rgba(244,63,94,.13)'" onmouseout="this.style.borderColor='rgba(244,63,94,0.2)';this.style.background='transparent'">
+        <span class="lbl">Account Balance</span>
+        <span class="val" id="acc" style="color:var(--cyan)">$100,000.00</span>
+      </div>
+      <div class="pill"><span class="lbl">Session PnL</span><span class="val" id="sPnl" style="color:var(--t3)">$0.00</span></div>
+      <button id="settingsNavBtn" class="nbtn" onclick="openAppSettings()">⚙ Settings</button>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-head">
+      <div class="sb-title">Markets</div>
+
+      <!-- Market-mode switcher: Crypto / Stocks -->
+      <div class="market-switcher">
+        <button class="msw-btn on" id="msw-crypto" onclick="switchToCryptoTab();loadAllPairsLazy()">
+          <span class="msw-ico">₿</span> Crypto
+        </button>
+        <button class="msw-btn" id="msw-stocks" onclick="switchToStocksTab()">
+          <span class="msw-ico">📈</span> Stocks
+          <span class="msw-badge closed" id="marketStatusBadge">Closed</span>
+        </button>
+      </div>
+
+      <!-- Crypto: search + All/Fav tabs -->
+      <div id="cryptoSbHead">
+        <div class="sb-search">
+          <span class="ico">⌕</span>
+          <input id="cryptoSearchInput" placeholder="Search crypto…" oninput="_pairFilter=this.value;renderPairs(this.value)">
+        </div>
+        <div class="sb-tabs">
+          <button class="sbt on" id="sbt-all" onclick="setSbTab('all')">All</button>
+          <button class="sbt" id="sbt-fav" onclick="setSbTab('fav')">★ Favorites <span class="fav-count" id="favCount" style="display:none"></span></button>
+        </div>
+      </div>
+
+      <!-- Stocks: search only -->
+      <div id="stocksSbHead" style="display:none">
+        <div class="sb-search">
+          <span class="ico">⌕</span>
+          <input id="stockSearchInput" placeholder="Search stocks…" oninput="renderStockPairs(this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Crypto list -->
+    <div class="pair-list" id="pairList"></div>
+
+    <!-- Stock list (hidden until stocks tab active) -->
+    <div class="pair-list" id="stockPairList" style="display:none"></div>
+  </div>
+
+  <!-- MAIN CHART -->
+  <div class="main">
+    <div class="ch">
+      <div class="ch-symbol" id="hSym">Bitcoin<span class="sym-sep"> / TetherUS</span><span class="sym-meta"> · 1m · Binance</span></div>
+      <div class="ch-price" id="hPrice">$67,420</div>
+      <div class="ptag up" id="hChg">+2.34%</div>
+      <div class="ch-stats">
+        <div class="cs"><span class="cs-lbl">24h High</span><span class="cs-val up" id="s24h">—</span></div>
+        <div class="cs"><span class="cs-lbl">24h Low</span><span class="cs-val dn" id="s24l">—</span></div>
+        <div class="cs"><span class="cs-lbl">Volume</span><span class="cs-val" id="sVol">—</span></div>
+        <div class="cs"><span class="cs-lbl">Mark</span><span class="cs-val" id="sMark">—</span></div>
+      </div>
+      <div class="tf-row">
+        <div class="sep"></div>
+        <button class="tfb on" onclick="setTF(this)">1m</button>
+        <button class="tfb" onclick="setTF(this)">3m</button>
+        <button class="tfb" onclick="setTF(this)">5m</button>
+        <button class="tfb" onclick="setTF(this)">15m</button>
+        <button class="tfb" onclick="setTF(this)">30m</button>
+        <div class="sep"></div>
+        <button class="tfb" onclick="setTF(this)">1h</button>
+        <button class="tfb" onclick="setTF(this)">2h</button>
+        <button class="tfb" onclick="setTF(this)">4h</button>
+        <button class="tfb" onclick="setTF(this)">6h</button>
+        <button class="tfb" onclick="setTF(this)">12h</button>
+        <div class="sep"></div>
+        <button class="tfb" onclick="setTF(this)">1D</button>
+        <button class="tfb" onclick="setTF(this)">3D</button>
+        <button class="tfb" onclick="setTF(this)">1W</button>
+        <button class="tfb" onclick="setTF(this)">1M</button>
+        <div class="sep"></div>
+        <button id="indicatorsBtn" onclick="openIndicatorsPanel()" title="Indicators"
+          style="display:flex;align-items:center;gap:5px;font-size:10px;padding:3px 10px 3px 8px;
+                 border-radius:4px;border:1px solid rgba(167,139,250,0.45);
+                 background:rgba(167,139,250,0.13);color:#a78bfa;cursor:pointer;
+                 font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;transition:all .18s">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Indicators ▾
+        </button>
+      </div>
+    </div>
+    <!-- Lightweight Charts mounts directly into this div -->
+    <div class="cw" id="cw">
+      <div class="ma-bar" id="ma-bar"></div>
+      <div id="candleTimer" class="candle-timer-overlay" style="display:none"></div>
+    </div>
+  </div>
+
+</div><!-- /.app -->
+
+<div class="tstack" id="tstack"></div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobNav">
+  <button class="mob-tab on" id="mobTab-chart" onclick="mobSwitch('chart')">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Chart
+  </button>
+  <button class="mob-tab" id="mobTab-markets" onclick="mobSwitch('markets')">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y1="21"/></svg>
+    Markets
+  </button>
+  <button class="mob-tab" id="mobTab-logout" style="color:rgba(244,63,94,0.8)" onclick="(function(){sessionStorage.removeItem('apex_authed_user');localStorage.removeItem('apex_remember_user');location.reload();})()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="stroke:rgba(244,63,94,0.8)"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Logout
+  </button>
+</nav>
+
+<!-- ── SCRIPTS — order matters ── -->
+<script src="state.js"></script>
+<script src="feed.js"></script>
+<script src="volume.js"></script>
+<script src="movingaverage.js"></script>
+<script src="stochrsi.js"></script>
+<script src="chart.js"></script>
+<script src="orderbook.js"></script>
+<script src="trading.js"></script>
+<script src="data_transfer.js"></script>
+<script src="settings.js"></script>
+<script src="stocks.js"></script>
+<script src="panels.js"></script>
+<script src="ui.js"></script>
+<script src="sounds.js"></script>
+
+<script>
+// ── BG ANIMATION ──────────────────────────────────────────────────────
+(()=>{const c=document.getElementById('bgC'),x=c.getContext('2d');let W,H,pts;const init=()=>{W=c.width=innerWidth;H=c.height=innerHeight;pts=Array.from({length:6},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,r:Math.random()*260+130,hue:Math.random()>.5?'0,212,255':'130,90,250'}));};const draw=()=>{x.clearRect(0,0,W,H);pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<-p.r||p.x>W+p.r)p.vx*=-1;if(p.y<-p.r||p.y>H+p.r)p.vy*=-1;const g=x.createRadialGradient(p.x,p.y,0,p.x,p.y,p.r);g.addColorStop(0,`rgba(${p.hue},.065)`);g.addColorStop(1,`rgba(${p.hue},0)`);x.fillStyle=g;x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);x.fill();});requestAnimationFrame(draw);};window.addEventListener('resize',init);init();draw();})();
+
+// ── SPIN KEYFRAME (used by lazy-load toast in state.js) ───────────────
+(function(){const s=document.createElement('style');s.textContent='@keyframes spin{to{transform:rotate(360deg)}}';document.head.appendChild(s);})();
+
+// ── BOOTSTRAP ─────────────────────────────────────────────────────────
+_injectPanels();           // panels.js — insert floating panel HTML
+loadSettings();            // settings.js — restore persisted prefs
+_initAutoSave();           // settings.js — wire auto-save hooks
+
+_updateFavCount();
+renderPairs();
+
+// ── RESTORE last-used pair from previous session ───────────────────────
+// Must run BEFORE selPair() so the right symbol is loaded on startup.
+var _apexLastPair = (function(){
+  try { return JSON.parse(localStorage.getItem('apex_last_pair') || 'null'); } catch(e){ return null; }
+})();
+if (_apexLastPair && _apexLastPair.sym && _apexLastPair.mode !== 'stock') {
+  S.pair = _apexLastPair.sym;  // overwrite state default with saved crypto symbol
+}
+
+selPair(S.pair);           // triggers chart + kline load
+renderPos();
+renderHist();
+startFeed();               // feed.js — open WebSocket
+
+setInterval(updateCandleTimer, 1000);
+updateCandleTimer();
+setInterval(loop, 750);
+
+_restoreStochRSIVisibility();   // settings.js
+_syncIndToggles();               // panels.js
+
+// Mobile: intercept selPair to auto-switch to chart view
+const _origSelPair=selPair;selPair=function(sym){_origSelPair(sym);if(window.innerWidth<=768)mobSwitch('chart');};
+// Mobile: intercept selStock to auto-switch to chart view
+const _origSelStock=selStock;selStock=function(sym){_origSelStock(sym);if(window.innerWidth<=768)mobSwitch('chart');};
+
+_initMobile();
+
+// Initialise market status badge
+updateMarketStatusBadge();
+setInterval(updateMarketStatusBadge,30000);
+
+// ── PERSIST pair selection so it survives page reloads ────────────────
+// Wraps the now-complete selPair / selStock (including mobile intercepts).
+(function(){
+  var _sp=selPair;
+  selPair=function(sym){
+    _sp(sym);
+    try{ localStorage.setItem('apex_last_pair',JSON.stringify({sym:sym,mode:'crypto'})); }catch(e){}
+  };
+  var _ss=selStock;
+  selStock=function(sym){
+    _ss(sym);
+    try{ localStorage.setItem('apex_last_pair',JSON.stringify({sym:sym,mode:'stock'})); }catch(e){}
+  };
+})();
+
+// ── RESTORE stocks tab if the user left on a stock ────────────────────
+if (_apexLastPair && _apexLastPair.mode === 'stock' && _apexLastPair.sym) {
+  switchToStocksTab();
+  // Small delay so the stocks list has time to render before selecting
+  setTimeout(function(){ selStock(_apexLastPair.sym); }, 120);
+}
+</script>
+</body>
+</html>

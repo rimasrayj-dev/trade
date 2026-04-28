@@ -1,0 +1,25 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   APEX — Chart / Trade Page Styles  (chart.css)
+   Loaded only by index.html — targets the chart view, not Paper Trader
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── APP GRID — chart page layout ──────────────────────────────────── */
+html.is-desktop .app,
+html.is-tablet .app,
+.app {
+  grid-template-columns: 235px 1fr;
+  grid-template-rows: 52px 1fr;
+}
+
+html.is-tablet .app {
+  grid-template-columns: 200px 1fr;
+}
+
+.main {
+  grid-column: 2 / -1;
+  grid-row: 2 / -1;
+}
+
+.sidebar {
+  grid-row: 2 / -1;
+}
